@@ -42,7 +42,8 @@ RUN yum install -y \
         selinux-policy-devel \
         yum-utils \
         rpm-build \
-        rpm-sign
+        rpm-sign \
+	gpg
 
 FROM fedora:41 AS fedora41
 RUN dnf install -y \
