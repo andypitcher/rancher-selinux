@@ -6,8 +6,6 @@ function enforceSELinux(){
     echo "> Check SELinux status"
     # Short circuit if SELinux is not being enforced.
     getenforce | grep -q Enforcing
-    # Remove dontaudits from policy for debugging
-    sudo semodule -DB
     # Install container-selinux and selinux-policy latest versions
     sudo dnf install -y container-selinux selinux-policy --best --allowerasing
     # Install rancher-selinux policy
@@ -113,6 +111,22 @@ function installRancherChart() {
     kubectl wait --for=condition=ready -n "${NAMESPACE}" pod -l "${POD_LABEL_SELECTOR}" --timeout=240s
 }
 
+function uninstallRancherChart() {
+    local CHART_NAME="$1"
+    local NAMESPACE="$2"
+
+    echo "> Uninstalling main chart ${CHART_NAME} from namespace ${NAMESPACE}"
+    helm uninstall "${CHART_NAME}" -n "${NAMESPACE}" --wait
+    
+    echo "> Uninstalling CRD chart ${CHART_NAME}-crd"
+    helm uninstall "${CHART_NAME}-crd" -n "${NAMESPACE}" --wait
+    echo "> Deleting namespace ${NAMESPACE}"
+    kubectl delete ns "${NAMESPACE}" --timeout=120s
+
+    # Force-reclaim caches to provide a clean memory slate for the next test
+    sudo sync && echo 3 > /proc/sys/vm/drop_caches
+}
+
 # Example: e2eSELinuxVerification "fluentbit" "fluent-bit" "cattle-logging-system" "rke_logreader_t"
 function e2eSELinuxVerification(){
     local CONTAINER_NAME="$1"
@@ -182,6 +196,11 @@ function main(){
             "${CONTAINER_RUNNING_NAME}" \
             "${NAMESPACE}" \
             "${SELINUX_TYPE}"
+
+        # 3. Uninstall the chart (free some resources)
+        uninstallRancherChart \
+            "${CHART_NAME}" \
+            "${NAMESPACE}"
     done
 }
 
