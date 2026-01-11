@@ -3,6 +3,8 @@
 set -euxo pipefail
 
 function enforceSELinux(){
+    free -m
+    lscpu
     echo "> Check SELinux status"
     # Short circuit if SELinux is not being enforced.
     getenforce | grep -q Enforcing
