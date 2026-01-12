@@ -1,6 +1,44 @@
 #!/bin/bash
 
-set -euxo pipefail
+#!/bin/bash
+# -E is critical: it ensures the trap is inherited by functions and subshells
+set -eEuxo pipefail
+
+dump_debug_info() {
+  # Capture the exit code of the failed command
+  EXIT_CODE=$?
+  echo "!!! ERROR detected (Exit Code: $EXIT_CODE). Dumping debug info... !!!"
+
+  echo ">>> [K8S] Pod Status (all namespaces)"
+  kubectl get pods -A
+
+  echo ">>> [K8S] Detailed Pod State in cattle-monitoring-system"
+  # This shows specifically why pods are failing (e.g., Syscall errors, Volume mount errors)
+  kubectl get pods -n cattle-monitoring-system -o wide
+  kubectl describe pods -n cattle-monitoring-system
+
+  echo ">>> [K8S] Cluster Events"
+  kubectl get events -A --sort-by='.lastTimestamp' | tail -n 50
+
+  echo ">>> [SELinux] Recent AVC Denials"
+  # Sudo is required for audit logs
+  sudo ausearch -m avc -ts recent 2>/dev/null || sudo grep "denied" /var/log/audit/audit.log | tail -n 100
+
+  echo ">>> [SELinux] Suggested Fixes (audit2allow)"
+  # This tells you exactly what rules to add to your rancher-selinux policy
+  sudo grep "denied" /var/log/audit/audit.log | audit2allow -R
+
+  echo ">>> [SELinux] Policy Status"
+  sestatus
+  semodule -l | grep rancher || echo "No rancher policy found"
+
+  echo ">>> [System] Journal Logs (K3s/RKE2)"
+  # Check both common service names
+  sudo journalctl -u k3s -u rke2-server --no-pager -n 300
+}
+
+# Apply the trap
+trap dump_debug_info ERR
 
 function enforceSELinux(){
     free -m
@@ -10,6 +48,7 @@ function enforceSELinux(){
     getenforce | grep -q Enforcing
     # Install container-selinux and selinux-policy latest versions
     sudo dnf install -y container-selinux selinux-policy --best --allowerasing
+    sudo semodule -DB
     # Install rancher-selinux policy
     sudo dnf install -y /tmp/rancher-selinux.rpm
 }
@@ -95,18 +134,25 @@ function installRancherChart() {
     echo "> Installing CRD chart ${CHART_NAME}-crd in namespace ${NAMESPACE}"
     helm upgrade --install=true \
         --labels=catalog.cattle.io/cluster-repo-name=rancher-charts \
-        --namespace="${NAMESPACE}" --timeout=20m0s --wait=true \
+        --namespace="${NAMESPACE}" --timeout=10m0s --wait=true \
         --create-namespace \
         "${CHART_NAME}-crd" "rancher-charts/${CHART_NAME}-crd"
 
+    # Start watching events in the background so they appear in GH Actions logs LIVE
+    kubectl get events -n "${NAMESPACE}" -w &
+    WATCH_PID=$!
+
     echo "> Installing main chart ${CHART_NAME} with SELinux enabled"
-    helm upgrade --install=true \
+    helm upgrade -v6 --install=true \
         --labels=catalog.cattle.io/cluster-repo-name=rancher-charts \
-        --namespace="${NAMESPACE}" --timeout=20m0s --wait=true \
+        --namespace="${NAMESPACE}" --timeout=10m0s --wait=true \
         --create-namespace \
         "${CHART_NAME}" "rancher-charts/${CHART_NAME}" \
         --set global.seLinux.enabled=true \
         ${EXTRA_HELM_ARGS}
+        
+    # Kill the watcher once helm finishes
+    kill $WATCH_PID || true
 
     # Wait for DaemonSet creation and Pod readiness
     kubectl wait --for=create -n "${NAMESPACE}" daemonset/"${DAEMONSET_NAME}" --timeout=240s
