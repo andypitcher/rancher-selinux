@@ -22,7 +22,9 @@ provision:
     if grep -q "selinux=1" /proc/cmdline; then
       exit 0
     fi
-    zypper install -y selinux-policy-targeted policycoreutils selinux-tools
-    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="security=selinux selinux=1 enforcing=1 /' /etc/default/grub
+    zypper -n install selinux-policy-targeted policycoreutils selinux-tools
+    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="security=selinux selinux=1 enforcing=1 \1"/' /etc/default/grub
     update-bootloader --refresh
+    # Mark filesystem for relabeling on the next boot.
+    touch /.autorelabel
     reboot

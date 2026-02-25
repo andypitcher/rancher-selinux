@@ -13,10 +13,10 @@ function enforceSELinux(){
     # Remove dontaudits from policy for debugging.
     sudo semodule -DB
     if isSUSE; then
-        # Install container-selinux and selinux-policy-base latest versions.
-        sudo zypper install -y container-selinux selinux-policy-base
+        # Install container-selinux and selinux-policy-targeted latest versions.
+        sudo zypper -n install container-selinux selinux-policy-targeted
         # Install rancher-selinux policy.
-        sudo zypper install -y --allow-unsigned-rpm /tmp/rancher-selinux.rpm
+        sudo zypper -n install --allow-unsigned-rpm /tmp/rancher-selinux.rpm
     else
         # Install extra kernel modules needed for networking/conntrack (EL10 requirement).
         # See: https://docs.rke2.io/install/requirements#linux
@@ -34,7 +34,7 @@ function installDependencies(){
     echo 'echo "export TERM=xterm"' >> ~/.bashrc
 
     if isSUSE; then
-        sudo zypper install -y jq git setools policycoreutils audit
+        sudo zypper -n install jq git setools policycoreutils audit
     else
         sudo dnf install -y jq git setools policycoreutils-python-utils
     fi

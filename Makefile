@@ -103,6 +103,19 @@ endif
 e2e:
 	$(MAKE) $(addprefix push-tool-, $(DISTROS))
 
+# microos requires SELinux to be enabled via a provision script on first boot,
+# so --plain cannot be used (it prevents provision scripts from running).
+e2e-microos:
+	$(MAKE) microos-build-image
+	$(MAKE) microos-build-artefacts
+
+	limactl start $(LIMA_DEBUG) --tty=false --cpus 6 --memory 12 --name=microos hack/e2e/microos.yaml
+	limactl cp build/microos/noarch/rancher-*.rpm microos:/tmp/rancher-selinux.rpm
+	limactl cp hack/e2e/setup-vm.sh microos:/tmp/setup-vm.sh
+	limactl shell microos sudo /tmp/setup-vm.sh
+
+	limactl delete -f microos
+
 e2e-%:
 	make $(subst :,/,$*)-build-image
 	make $(subst :,/,$*)-build-artefacts
