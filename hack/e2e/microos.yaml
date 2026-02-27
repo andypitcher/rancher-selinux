@@ -13,18 +13,6 @@ mounts:
 - location: "~"
 - location: "/tmp/lima"
   writable: true
-provision:
-- mode: system
-  script: |
-    #!/bin/bash
-    set -eux
-    # Enable SELinux enforcing mode if not already active.
-    if grep -q "selinux=1" /proc/cmdline; then
-      exit 0
-    fi
-    zypper -n install selinux-policy-targeted policycoreutils selinux-tools
-    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="security=selinux selinux=1 enforcing=1 \1"/' /etc/default/grub
-    update-bootloader --refresh
-    # Mark filesystem for relabeling on the next boot.
-    touch /.autorelabel
-    reboot
+# SELinux is configured explicitly by the Makefile e2e-microos target via
+# hack/e2e/microos-selinux-setup.sh rather than via Lima provision scripts,
+# because Lima provision scripts are unreliable for this image.
