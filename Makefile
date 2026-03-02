@@ -103,28 +103,6 @@ endif
 e2e:
 	$(MAKE) $(addprefix push-tool-, $(DISTROS))
 
-# microos requires SELinux to be configured before running the main e2e test.
-# Lima provision scripts are unreliable for this image, so SELinux setup is
-# done explicitly: start with --plain, run the setup script, stop, restart.
-e2e-microos:
-	$(MAKE) microos-build-image
-	$(MAKE) microos-build-artefacts
-
-	limactl start $(LIMA_DEBUG) --tty=false --cpus 6 --memory 12 --plain --name=microos hack/e2e/microos.yaml
-	# Install SELinux packages, relabel filesystem, and update GRUB (no reboot inside the script).
-	limactl cp hack/e2e/microos-selinux-setup.sh microos:/tmp/microos-selinux-setup.sh
-	limactl shell microos sudo /tmp/microos-selinux-setup.sh
-	# Restart the VM so it boots with SELinux enforcing.
-	# CPU/memory settings are already saved in the instance config from the initial start above.
-	limactl stop microos
-	limactl start $(LIMA_DEBUG) --tty=false microos
-	# Run the main e2e test.
-	limactl cp build/microos/noarch/rancher-*.rpm microos:/tmp/rancher-selinux.rpm
-	limactl cp hack/e2e/setup-vm.sh microos:/tmp/setup-vm.sh
-	limactl shell microos sudo /tmp/setup-vm.sh
-
-	limactl delete -f microos
-
 e2e-%:
 	make $(subst :,/,$*)-build-image
 	make $(subst :,/,$*)-build-artefacts
