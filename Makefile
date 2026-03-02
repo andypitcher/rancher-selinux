@@ -109,7 +109,7 @@ e2e-%:
 	
 	limactl start $(LIMA_DEBUG) --tty=false --cpus 6 --memory 12 --plain --name=$(subst :,/,$*) hack/e2e/$(subst :,/,$*).yaml
 	limactl cp build/$(subst :,/,$*)/noarch/rancher-*.rpm $(subst :,/,$*):/tmp/rancher-selinux.rpm
-	limactl cp hack/e2e/setup-vm.sh $(subst :,/,$*):/tmp/setup-vm.sh
+	limactl cp $(or $(wildcard hack/e2e/$(subst :,/,$*)-setup-vm.sh),hack/e2e/setup-vm.sh) $(subst :,/,$*):/tmp/setup-vm.sh
 	limactl shell $(subst :,/,$*) sudo /tmp/setup-vm.sh
 
 	limactl delete -f $(subst :,/,$*)
