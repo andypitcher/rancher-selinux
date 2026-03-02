@@ -34,7 +34,7 @@ function installDependencies(){
     echo 'echo "export TERM=xterm"' >> ~/.bashrc
 
     if isSUSE; then
-        sudo zypper -n install jq git setools policycoreutils audit
+        sudo zypper -n install jq git setools-console selinux-tools policycoreutils audit
     else
         sudo dnf install -y jq git setools policycoreutils-python-utils
     fi
