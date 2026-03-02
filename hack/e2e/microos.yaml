@@ -1,10 +1,12 @@
-# Uses Leap 16.0 for openSUSE MicroOS e2e testing.
-# Leap 16.0 ships with SELinux enabled and enforcing by default — no provision scripts required.
+# Uses openSUSE Tumbleweed for microos e2e testing.
+# Tumbleweed ships with SELinux enabled and enforcing by default — no provision scripts required.
+# Tumbleweed is also the build base (opensuse/tumbleweed:latest in Dockerfile), ensuring the
+# compiled policy module version matches the runtime libsepol version.
 
 images:
-- location: "https://download.opensuse.org/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.x86_64-Cloud.qcow2"
+- location: "https://download.opensuse.org/tumbleweed/appliances/openSUSE-Tumbleweed-Minimal-VM.x86_64-Cloud.qcow2"
   arch: "x86_64"
-- location: "https://download.opensuse.org/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.aarch64-Cloud.qcow2"
+- location: "https://download.opensuse.org/ports/aarch64/tumbleweed/appliances/openSUSE-Tumbleweed-Minimal-VM.aarch64-Cloud.qcow2"
   arch: "aarch64"
 # Hint: to allow 9p and virtiofs, replace the `kernel-default-base` package with `kernel-default` and reboot the VM.
 # https://github.com/lima-vm/lima/issues/3055
