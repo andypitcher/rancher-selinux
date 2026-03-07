@@ -2,12 +2,39 @@ name: Tests
 
 on:
   push:
+    paths:
+      - 'policy/**'
+      - 'scripts/**'
+      - '**/*.te'
+      - '**/*.fc'
+      - '**/*.if'
+      - '.github/workflows/tests.yml'
   pull_request:
+    paths:
+      - 'policy/**'
+      - 'scripts/**'
+      - '**/*.te'
+      - '**/*.fc'
+      - '**/*.if'
+      - '.github/workflows/tests.yml'
+  schedule:
+    - cron: '0 2 * * *'
 
 permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+    - name: Lint workflow YAML files
+      run: |
+        pip install --quiet yamllint
+        yamllint .github/workflows/
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -22,6 +49,7 @@ jobs:
     - run: make build DRY_RUN=true
 
   e2e:
+    if: github.actor != 'dependabot[bot]'
     strategy:
       matrix:
         distro: [centos9, centos10, fedora42, microos]
@@ -38,7 +66,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends ovmf qemu-system-x86 qemu-utils
         sudo modprobe kvm
-        sudo chown $(whoami) /dev/kvm        
+        sudo chown $(whoami) /dev/kvm
 
     - name: "Install Lima"
       run: |
@@ -49,13 +77,30 @@ jobs:
         sudo tar Cxzvf /usr/local "${FILE}"
         rm -f "${FILE}"
         # Export LIMA_VERSION For the GHA cache key
-        echo "LIMA_VERSION=${LIMA_VERSION}" >>$GITHUB_ENV        
+        echo "LIMA_VERSION=${LIMA_VERSION}" >>$GITHUB_ENV
 
     - name: "Cache ~/.cache/lima"
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
       with:
         path: ~/.cache/lima
         key: lima-${{ env.LIMA_VERSION }}
-      
+
     - name: E2E ${{ matrix.distro }}
       run: make e2e-${{ matrix.distro }}
+
+  notify-failure:
+    needs: e2e
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+    - name: Open issue on nightly E2E failure
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh issue create \
+          --repo "${{ github.repository }}" \
+          --title "Nightly E2E failure: policy tests broken ($(date -u +'%Y-%m-%d'))" \
+          --body "The nightly E2E run failed on $(date -u +'%Y-%m-%d %H:%M UTC'). A recent base image update (e.g. opensuse/tumbleweed, fedora, or centos) may have broken the current SELinux policy. See the [failed workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
