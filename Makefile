@@ -1,5 +1,5 @@
 RUNNER ?= docker
-POLICIES = $(shell find policy -mindepth 1 -maxdepth 1 -type d | sort -u | cut -f 2 -d'/')
+POLICIES = $(shell find policy/distros -type f -name '*.mk' | sort -u | xargs -n1 basename | cut -f1 -d.)
 DISTROS = $(shell find hack/e2e -type f | grep .yaml | sort -u | cut -f3 -d'/' | cut -f1 -d.)
 LIMA_DEBUG :=
 
@@ -32,7 +32,7 @@ include hack/make/tools.mk
 build: ## build all policies.
 	$(MAKE) $(addsuffix -build, $(POLICIES))
 
-%-build: version ## build a specific policy.
+%-build: version verify-policy-version ## build a specific policy.
 	$(MAKE) $(subst :,/,$*)-build-clean
 	$(MAKE) $(subst :,/,$*)-build-image
 	$(MAKE) $(subst :,/,$*)-build-artefacts
@@ -98,7 +98,25 @@ endif
 	@echo RPM_VERSION: $(RPM_VERSION)
 	@echo RPM_RELEASE: $(RPM_RELEASE)
 	@echo RPM_CHANNEL: $(RPM_CHANNEL)
+	@echo POLICY_VERSION: $(POLICY_VERSION)
+	@echo TE_VERSION: $(TE_VERSION)
 	@echo VERSION: $(VERSION)
+
+.PHONY: verify-policy-version
+verify-policy-version: ## ensure policy_module() matches the tagged version.
+	@if [ -z "$(TE_VERSION)" ]; then \
+		echo "error: could not parse policy_module() from policy/rancher.te"; \
+		exit 1; \
+	fi
+	@if [ "$(RPM_VERSION)" = "0.0.0" ]; then \
+		echo "verify-policy-version: snapshot build, skipping ($(TE_VERSION))"; \
+	elif [ "$(TE_VERSION)" != "$(POLICY_VERSION)" ]; then \
+		echo "error: policy/rancher.te declares policy_module(rancher, $(TE_VERSION))"; \
+		echo "       but the tag resolves to $(POLICY_VERSION). Update one of them."; \
+		exit 1; \
+	else \
+		echo "verify-policy-version: ok ($(TE_VERSION))"; \
+	fi
 
 e2e: ## test selinux policy against all distros.
 	$(MAKE) $(addprefix push-tool-, $(DISTROS))

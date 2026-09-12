@@ -50,8 +50,14 @@ WORKDIR /src
 
 ARG POLICY
 COPY hack/sign /usr/local/bin/sign
-COPY policy/${POLICY}/rancher-selinux.spec \
-     policy/${POLICY}/rancher.fc \
-     policy/${POLICY}/rancher.te \
+
+# A single policy source is shared by every distro. The per-distro
+# variables (disttag, pinned policy versions, package names, and the m4
+# flags used to select conditional rules) arrive as distro.mk, which
+# hack/build sources to render rancher-selinux.spec from the template.
+COPY policy/rancher.te \
+     policy/rancher.fc \
+     policy/rancher-selinux.spec.in \
      hack/build \
      hack/metadata ./
+COPY policy/distros/${POLICY}.mk ./distro.mk
