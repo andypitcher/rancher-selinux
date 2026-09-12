@@ -5,11 +5,34 @@ OUTDIR="${OUTDIR:-/out}"
 USER="${USER:-1000}"
 GROUP="${GROUP:-1000}"
 
+# Per-distro variables, rendered into the image by the Dockerfile as
+# distro.mk. Simple KEY := value lines, so they are shell-sourceable
+# once the ` :=' assignment operator is normalised to `='.
+function loadDistroVars(){
+    local mk="${1:-distro.mk}"
+    # shellcheck disable=SC1090
+    source <(sed -E 's/^([A-Z_]+)[[:space:]]*:=[[:space:]]*(.*)$/\1="\2"/' "${mk}")
+}
+
+function renderSpec(){
+    sed -e "s|@SELINUX_POLICYVER@|${SELINUX_POLICYVER}|g" \
+        -e "s|@CONTAINER_POLICYVER@|${CONTAINER_POLICYVER}|g" \
+        -e "s|@DISTTAG@|${DISTTAG}|g" \
+        -e "s|@SELINUX_UTILS@|${SELINUX_UTILS}|g" \
+        -e "s|@BUILDREQUIRES@|${BUILDREQUIRES}|g" \
+        rancher-selinux.spec.in > rancher-selinux.spec
+}
+
 function build(){
     local RPM_VERSION=$1
     local RPM_RELEASE=$2
 
-    make -f /usr/share/selinux/devel/Makefile rancher.pp
+    loadDistroVars distro.mk
+    renderSpec
+
+    # M4PARAM carries -D rancher_suse on SLE/Micro so that rancher.te
+    # excludes permissions the older refpolicy does not define.
+    make -f /usr/share/selinux/devel/Makefile M4PARAM="${M4PARAM:-}" rancher.pp
 
     rpmbuild \
         --define "rancher_selinux_version ${RPM_VERSION}" \
